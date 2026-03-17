@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hangman - Internet Explorer Compatible</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+      color: #222;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #d9d9d9;
+      padding: 20px;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 30px;
+    }
+    .row {
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .left, .right {
+      float: left;
+      box-sizing: border-box;
+    }
+    .left {
+      width: 42%;
+      padding-right: 20px;
+    }
+    .right {
+      width: 58%;
+    }
+    .panel {
+      border: 1px solid #d9d9d9;
+      background: #fafafa;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    #wordDisplay {
+      font-size: 34px;
+      letter-spacing: 6px;
+      font-weight: bold;
+      min-height: 48px;
+      margin: 15px 0;
+      word-wrap: break-word;
+    }
+    #message {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    #wrongLetters, #usedLetters {
+      min-height: 24px;
+      padding: 8px;
+      background: #fff;
+      border: 1px solid #ddd;
+    }
+    .keyboard-row {
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .key-btn {
+      width: 42px;
+      height: 42px;
+      margin: 2px;
+      border: 1px solid #999;
+      background: #ffffff;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .key-btn:hover {
+      background: #e9f2ff;
+    }
+    .key-btn:disabled {
+      cursor: default;
+      background: #dcdcdc;
+      color: #777;
+    }
+    .controls input {
+      width: 65%;
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #999;
+    }
+    .controls button, .main-btn {
+      padding: 9px 14px;
+      font-size: 15px;
+      border: 1px solid #666;
+      background: #f0f0f0;
+      cursor: pointer;
+    }
+    .controls button:hover, .main-btn:hover {
+      background: #e0e0e0;
+    }
+    .status-line {
+      margin-bottom: 10px;
+    }
+    .small {
+      font-size: 13px;
+      color: #555;
+    }
+    #hangmanCanvas {
+      display: block;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    .footer-note {
+      margin-top: 15px;
+      font-size: 13px;
+      color: #666;
+    }
+    .clear {
+      clear: both;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Hangman Game</h1>
+
+    <div class="row">
+      <div class="left">
+        <div class="panel">
+          <canvas id="hangmanCanvas" width="280" height="280"></canvas>
+          <p class="status-line"><strong>Wrong guesses:</strong> <span id="wrongCount">0</span> / 6</p>
+        </div>
+
+        <div class="panel controls">
+          <p><strong>Enter the secret word</strong></p>
+          <input type="password" id="customWord" maxlength="20" placeholder="Type a word">
+          <button type="button" onclick="startCustomGame()">Start Game</button>
+          <p class="small">Use only A-Z letters. Minimum 3 letters.</p>
+        </div>
+
+        <div class="panel">
+          <button type="button" class="main-btn" onclick="resetCurrentGame()">Restart Game</button>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="panel">
+          <div id="message">Enter a secret word and start the game.</div>
+          <div id="wordDisplay">_ _ _ _ _</div>
+        </div>
+
+        <div class="panel">
+          <p><strong>Wrong letters:</strong></p>
+          <div id="wrongLetters"></div>
+        </div>
+
+        <div class="panel">
+          <p><strong>Used letters:</strong></p>
+          <div id="usedLetters"></div>
+        </div>
+
+        <div class="panel">
+          <p><strong>Keyboard</strong></p>
+          <div id="keyboard"></div>
+          <p class="small">You can also use the computer keyboard.</p>
+        </div>
+      </div>
+      <div class="clear"></div>
+    </div>
+
+    <div class="footer-note">
+      Compatible with older browsers using classic HTML, CSS, and JavaScript.
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    var secretWord = '';
+    var guessedLetters = [];
+    var maxWrong = 6;
+    var gameOver = false;
+    var gameStarted = false;
+
+    function contains(arr, value) {
+      var i;
+      for (i = 0; i < arr.length; i++) {
+        if (arr[i] === value) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function getWrongLetters() {
+      var wrong = [];
+      var i;
+      for (i = 0; i < guessedLetters.length; i++) {
+        if (secretWord.indexOf(guessedLetters[i]) === -1) {
+          wrong.push(guessedLetters[i]);
+        }
+      }
+      return wrong;
+    }
+
+    function isWinner() {
+      var i;
+      for (i = 0; i < secretWord.length; i++) {
+        if (!contains(guessedLetters, secretWord.charAt(i))) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function updateWordDisplay() {
+      var display = '';
+      var i;
+
+      if (!gameStarted || secretWord === '') {
+        document.getElementById('wordDisplay').innerHTML = '_ _ _ _ _';
+        return;
+      }
+
+      for (i = 0; i < secretWord.length; i++) {
+        if (contains(guessedLetters, secretWord.charAt(i))) {
+          display += secretWord.charAt(i) + ' ';
+        } else {
+          display += '_ ';
+        }
+      }
+      document.getElementById('wordDisplay').innerHTML = display;
+    }
+
+    function updateLettersDisplay() {
+      var wrong = getWrongLetters();
+      document.getElementById('wrongLetters').innerHTML = wrong.join(' ');
+      document.getElementById('usedLetters').innerHTML = guessedLetters.join(' ');
+      document.getElementById('wrongCount').innerHTML = wrong.length;
+    }
+
+    function updateMessage() {
+      var wrong = getWrongLetters();
+      var msg = 'Enter a secret word and start the game.';
+
+      if (!gameStarted) {
+        gameOver = false;
+        document.getElementById('message').innerHTML = msg;
+        disableKeyboardIfNeeded();
+        return;
+      }
+
+      msg = 'Guess the hidden word.';
+
+      if (isWinner()) {
+        msg = 'You won! The word was ' + secretWord + '.';
+        gameOver = true;
+      } else if (wrong.length >= maxWrong) {
+        msg = 'You lost. The word was ' + secretWord + '.';
+        gameOver = true;
+      } else {
+        gameOver = false;
+      }
+
+      document.getElementById('message').innerHTML = msg;
+      disableKeyboardIfNeeded();
+    }
+
+    function guessLetter(letter) {
+      if (gameOver || !gameStarted) {
+        return;
+      }
+      if (!letter || secretWord === '') {
+        return;
+      }
+      if (contains(guessedLetters, letter)) {
+        return;
+      }
+      guessedLetters.push(letter);
+      refreshGame();
+    }
+
+    function refreshGame() {
+      updateWordDisplay();
+      updateLettersDisplay();
+      updateMessage();
+      drawHangman();
+    }
+
+    function clearGameArea() {
+      guessedLetters = [];
+      gameOver = false;
+      updateWordDisplay();
+      updateLettersDisplay();
+      updateMessage();
+      drawHangman();
+      buildKeyboard();
+    }
+
+    function startCustomGame() {
+      var value = document.getElementById('customWord').value.toUpperCase();
+      var cleaned = '';
+      var i;
+      var ch;
+
+      for (i = 0; i < value.length; i++) {
+        ch = value.charAt(i);
+        if (ch >= 'A' && ch <= 'Z') {
+          cleaned += ch;
+        }
+      }
+
+      if (cleaned.length < 3) {
+        alert('The word must have at least 3 letters.');
+        return;
+      }
+
+      secretWord = cleaned;
+      gameStarted = true;
+      guessedLetters = [];
+      gameOver = false;
+      document.getElementById('customWord').value = '';
+      buildKeyboard();
+      refreshGame();
+    }
+
+    function resetCurrentGame() {
+      if (!gameStarted || secretWord === '') {
+        document.getElementById('message').innerHTML = 'Enter a secret word and start the game.';
+        return;
+      }
+      guessedLetters = [];
+      gameOver = false;
+      buildKeyboard();
+      refreshGame();
+    }
+
+    function buildKeyboard() {
+      var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      var keyboard = document.getElementById('keyboard');
+      var html = '';
+      var rows = [10, 9, 7];
+      var index = 0;
+      var row;
+      var count;
+      var j;
+      var letter;
+
+      for (row = 0; row < rows.length; row++) {
+        count = rows[row];
+        html += '<div class="keyboard-row">';
+        for (j = 0; j < count; j++) {
+          letter = letters.charAt(index);
+          html += '<button type="button" id="key_' + letter + '" class="key-btn" onclick="guessLetter(\'' + letter + '\')">' + letter + '</button>';
+          index++;
+        }
+        html += '</div>';
+      }
+
+      keyboard.innerHTML = html;
+      disableKeyboardIfNeeded();
+      disableUsedKeys();
+    }
+
+    function disableUsedKeys() {
+      var i;
+      var btn;
+      for (i = 0; i < guessedLetters.length; i++) {
+        btn = document.getElementById('key_' + guessedLetters[i]);
+        if (btn) {
+          btn.disabled = true;
+        }
+      }
+    }
+
+    function disableKeyboardIfNeeded() {
+      var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      var i;
+      var btn;
+      for (i = 0; i < letters.length; i++) {
+        btn = document.getElementById('key_' + letters.charAt(i));
+        if (btn) {
+          if (!gameStarted || gameOver || contains(guessedLetters, letters.charAt(i))) {
+            btn.disabled = true;
+          } else {
+            btn.disabled = false;
+          }
+        }
+      }
+    }
+
+    function drawHangman() {
+      var canvas = document.getElementById('hangmanCanvas');
+      if (!canvas.getContext) {
+        return;
+      }
+
+      var ctx = canvas.getContext('2d');
+      var wrong = getWrongLetters().length;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#222';
+
+      ctx.beginPath();
+      ctx.moveTo(30, 250);
+      ctx.lineTo(130, 250);
+      ctx.moveTo(80, 250);
+      ctx.lineTo(80, 30);
+      ctx.lineTo(190, 30);
+      ctx.lineTo(190, 60);
+      ctx.stroke();
+
+      if (wrong >= 1) {
+        ctx.beginPath();
+        ctx.arc(190, 85, 25, 0, Math.PI * 2, true);
+        ctx.stroke();
+      }
+      if (wrong >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(190, 110);
+        ctx.lineTo(190, 165);
+        ctx.stroke();
+      }
+      if (wrong >= 3) {
+        ctx.beginPath();
+        ctx.moveTo(190, 125);
+        ctx.lineTo(160, 145);
+        ctx.stroke();
+      }
+      if (wrong >= 4) {
+        ctx.beginPath();
+        ctx.moveTo(190, 125);
+        ctx.lineTo(220, 145);
+        ctx.stroke();
+      }
+      if (wrong >= 5) {
+        ctx.beginPath();
+        ctx.moveTo(190, 165);
+        ctx.lineTo(165, 205);
+        ctx.stroke();
+      }
+      if (wrong >= 6) {
+        ctx.beginPath();
+        ctx.moveTo(190, 165);
+        ctx.lineTo(215, 205);
+        ctx.stroke();
+      }
+    }
+
+    function handleKeyPress(evt) {
+      evt = evt || window.event;
+      var code = evt.keyCode || evt.which;
+      var letter = String.fromCharCode(code).toUpperCase();
+      if (letter >= 'A' && letter <= 'Z') {
+        guessLetter(letter);
+      }
+    }
+
+    if (document.addEventListener) {
+      document.addEventListener('keydown', handleKeyPress, false);
+    } else if (document.attachEvent) {
+      document.attachEvent('onkeydown', handleKeyPress);
+    }
+
+    window.onload = function() {
+      buildKeyboard();
+      clearGameArea();
+    };
+  </script>
+</body>
+</html>
